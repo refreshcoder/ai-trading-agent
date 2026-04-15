@@ -21,3 +21,17 @@ PYTHONPATH=. python src/main.py
 ```bash
 PYTHONPATH=. pytest tests/ -v
 ```
+
+## 一键运行
+
+macOS/Linux:
+
+```bash
+bash scripts/run.sh
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run.ps1
+```
