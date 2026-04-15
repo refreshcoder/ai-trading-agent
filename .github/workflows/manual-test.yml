@@ -7,6 +7,10 @@ on:
         description: 'Reason for running the test manually'
         required: false
         default: 'Routine check'
+      provider:
+        description: 'Market data provider (offline or akshare)'
+        required: true
+        default: 'offline'
 
 jobs:
   test:
@@ -40,5 +44,11 @@ jobs:
       - name: Run Project Simulation
         env:
           PYTHONPATH: .
+          DATA_PROVIDER: ${{ inputs.provider }}
+          SYMBOLS: 600519
+          SPOT_POLL_INTERVAL_SEC: 1
+          KLINE_REFRESH_INTERVAL_SEC: 1
+          MAX_LOOPS: 1
+          STRICT_TRADING_SESSIONS: "false"
         run: |
           python src/main.py

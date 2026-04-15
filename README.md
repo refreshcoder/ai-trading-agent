@@ -13,6 +13,7 @@
 ## 运行
 ```bash
 pip install -r requirements.txt
+cp .env.example .env
 PYTHONPATH=. python src/main.py
 ```
 

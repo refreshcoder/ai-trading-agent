@@ -1,70 +1,84 @@
 import asyncio
-from src.models import AgentProfile
-from src.broker import PaperBroker
-from src.engine import FilterEngine
+import json
+
 from src.agent import AgentBrain
+from src.broker import PaperBroker
+from src.config import load_config
+from src.engine import FilterEngine
+from src.market_feed import MarketFeed
+from src.models import AgentProfile
+from src.providers.offline_provider import OfflineProvider
 
 
-async def mock_market_feed(engine: FilterEngine):
-    """Simulates incoming market data ticks"""
-    for _ in range(3):
-        await asyncio.sleep(0.1)
-        await engine.process_raw_data(
-            {"symbol": "600519.SH", "price": 1600.0, "volume": 15000}
-        )
+def build_provider(name: str):
+    n = (name or "").strip().lower()
+    if n == "akshare":
+        from src.providers.akshare_provider import AkShareProvider
 
-
-async def agent_worker(
-        queue: asyncio.Queue,
-        brain: AgentBrain,
-        broker: PaperBroker):
-    """Listens to queue and makes decisions"""
-    while True:
-        try:
-            event = await asyncio.wait_for(queue.get(), timeout=1.0)
-            print(
-                f"Agent received event: {
-                    event.event_type} for {
-                    event.symbol}")
-
-            async def mock_call(p):
-                return (
-                    '{"thought": "mock", "action": "BUY", '
-                    '"symbol": "600519.SH", "price_limit": 1605.0, '
-                    '"volume": 100}'
-                )
-            brain._call_llm_api = mock_call
-
-            decision = await brain.make_decision(event, broker.positions)
-            print(f"Agent decided: {decision.action} {decision.volume} shares")
-
-            success = broker.execute(decision)
-            print(
-                f"Broker execution success: {success}, Cash left: {
-                    broker.cash}")
-            queue.task_done()
-        except asyncio.TimeoutError:
-            break  # Exit loop after timeout for testing purposes
+        return AkShareProvider()
+    if n == "offline":
+        return OfflineProvider()
+    raise ValueError(f"Unsupported provider: {name}")
 
 
 async def main():
-    event_queue = asyncio.Queue()
-    broker = PaperBroker(initial_cash=500000.0)
-    engine = FilterEngine(event_queue)
+    cfg = load_config()
+    symbols = cfg.symbols or ["600519"]
+
+    event_queue: asyncio.Queue = asyncio.Queue()
+    broker = PaperBroker(initial_cash=cfg.initial_cash)
+    engine = FilterEngine(event_queue=event_queue)
 
     profile = AgentProfile(
         name="MainBot",
         personality="Test",
         risk_tolerance="Low",
-        expected_return="10%")
+        expected_return="10%",
+    )
     brain = AgentBrain(profile=profile, api_key="dummy")
 
-    # Run feed and worker concurrently
-    await asyncio.gather(
-        mock_market_feed(engine),
-        agent_worker(event_queue, brain, broker)
+    async def mock_call_llm_api(prompt: str) -> str:
+        return json.dumps(
+            {
+                "thought": "mock",
+                "action": "HOLD",
+                "symbol": symbols[0],
+            }
+        )
+
+    brain._call_llm_api = mock_call_llm_api
+
+    provider = build_provider(cfg.provider)
+    feed = MarketFeed(
+        provider=provider,
+        symbols=symbols,
+        engine=engine,
+        spot_poll_interval_sec=cfg.spot_poll_interval_sec,
+        kline_refresh_interval_sec=cfg.kline_refresh_interval_sec,
+        strict_trading_sessions=cfg.strict_trading_sessions,
+        trade_sessions=cfg.trade_sessions,
     )
-    print("Simulation finished.")
+
+    done = asyncio.Event()
+
+    async def run_feed():
+        await feed.run(max_loops=cfg.max_loops)
+        done.set()
+
+    async def run_agent():
+        while True:
+            if done.is_set() and event_queue.empty():
+                break
+            try:
+                event = await asyncio.wait_for(event_queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+            decision = await brain.make_decision(event, broker.positions)
+            broker.execute(decision)
+            event_queue.task_done()
+
+    await asyncio.gather(run_feed(), run_agent())
+
 
 if __name__ == "__main__":
     asyncio.run(main())

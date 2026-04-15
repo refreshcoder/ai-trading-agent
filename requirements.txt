@@ -1,3 +1,4 @@
 pydantic
 pytest
 pytest-asyncio
+akshare
