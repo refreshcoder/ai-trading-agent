@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, Any
 from src.models import MarketEvent
 
+
 class FilterEngine:
     def __init__(self, event_queue: asyncio.Queue):
         self.event_queue = event_queue

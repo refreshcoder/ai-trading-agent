@@ -1,6 +1,6 @@
-import pytest
 from datetime import datetime
 from src.models import AgentProfile, MarketEvent, LLMDecision
+
 
 def test_agent_profile_validation():
     profile = AgentProfile(
@@ -11,6 +11,7 @@ def test_agent_profile_validation():
     )
     assert profile.name == "Test"
 
+
 def test_market_event_validation():
     event = MarketEvent(
         timestamp=datetime.now(),
@@ -20,6 +21,7 @@ def test_market_event_validation():
         features={"ma5": 1490.0}
     )
     assert event.symbol == "600519.SH"
+
 
 def test_llm_decision_validation():
     decision = LLMDecision(

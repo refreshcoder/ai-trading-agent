@@ -2,11 +2,13 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Dict, Any, Literal, Optional
 
+
 class AgentProfile(BaseModel):
     name: str
     personality: str
     risk_tolerance: str
     expected_return: str
+
 
 class MarketEvent(BaseModel):
     timestamp: datetime
@@ -14,6 +16,7 @@ class MarketEvent(BaseModel):
     event_type: str
     current_price: float
     features: Dict[str, Any]
+
 
 class LLMDecision(BaseModel):
     thought: str
